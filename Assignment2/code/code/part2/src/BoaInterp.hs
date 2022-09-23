@@ -175,7 +175,8 @@ eval (Compr exp ((CCFor vn c):cs)) =
     {
       e <- eval c;
       case e of
-        ListVal e' -> concat $ map (\x -> withBinding vn x (eval (Compr e cs))) e'
+        ListVal e' -> let compList x = [withBinding vn x (eval (Compr exp cs))]
+                      in fmap ListVal (linkComp (concat $ map compList e'))
         _          -> abort (EBadArg "CCFor Error: CCFor VName (List [Exp])")
     }
 eval (Compr exp ((CCIf c):cs)) = 
@@ -187,15 +188,9 @@ eval (Compr exp ((CCIf c):cs)) =
       else
         return (ListVal [])
     }
-
-
-isListVal :: Value -> Bool
-isListVal (ListVal (x:xs)) = True
-isListVal _ = False
-
-extractList :: Value -> [Value]
-extractList (ListVal x) = x
-extractList x = []
+linkComp :: [Comp Value] -> Comp [Value]
+linkComp []     = return []
+linkComp (x:xs) = pure (:) <*> x <*> (linkComp xs)
 
 exec :: Program -> Comp ()
 exec [] = return mempty
