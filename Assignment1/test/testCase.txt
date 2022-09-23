@@ -1,0 +1,13 @@
+x = (0,0)
+dir1 = [North,South,East,West]
+dir = [North,South,East,West,North]
+
+
+
+x = Cst 1
+y = Add x x
+z = Add y (Cst 1)
+z' = Add (Cst 1) y
+
+m = Add (Cst 1) (Sub (Cst 2) (Mul (Cst 3) (Div (Cst 4) (Pow (Cst 5) (Cst 6)))))
+
