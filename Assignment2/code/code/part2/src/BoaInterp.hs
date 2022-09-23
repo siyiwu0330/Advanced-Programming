@@ -168,8 +168,6 @@ eval (List (x:xs)) =
         (ListVal zs) -> return (ListVal (y:zs))
         _            -> error "List Error"
     }
-
-eval (Compr _ []) = return (ListVal [])
 eval (Compr exp ((CCFor vn c):cs)) = 
   do
     {
@@ -189,7 +187,7 @@ eval (Compr exp ((CCIf c):cs)) =
         return (ListVal [])
     }
 linkComp :: [Comp Value] -> Comp [Value]
-linkComp []     = return []
+linkComp []     = return [] :: Comp [Value]
 linkComp (x:xs) = pure (:) <*> x <*> (linkComp xs)
 
 exec :: Program -> Comp ()
