@@ -67,10 +67,10 @@ operate Plus (IntVal x) (IntVal y)  = Right (IntVal (x + y))
 operate Minus (IntVal x) (IntVal y) = Right (IntVal (x - y))
 operate Times (IntVal x) (IntVal y) = Right (IntVal (x * y))
 operate Div (IntVal x) (IntVal y)
-  | IntVal y == IntVal 0          = Left "Div Zero"
+  | IntVal y == IntVal 0            = Left "Div Zero"
   | otherwise                       = Right (IntVal (x `div` y))
 operate Mod (IntVal x) (IntVal y)
-  | IntVal y == IntVal 0          = Left "Mod Zero"
+  | IntVal y == IntVal 0            = Left "Mod Zero"
   | otherwise                       = Right (IntVal (x `mod` y))
 operate Eq x y
   | x == y                          = Right TrueVal
@@ -107,12 +107,12 @@ rangeFunc :: Value -> Value -> Value -> [Value]
 rangeFunc (IntVal e0) (IntVal e1) (IntVal e2)
   | e0 >= e1 && e2 > 0 = []
   | e0 <= e1 && e2 < 0 = []
-  | otherwise          = IntVal e0 : (rangeFunc (IntVal (e0 + e2)) (IntVal e1) (IntVal e2))
+  | otherwise          = IntVal e0 : rangeFunc (IntVal (e0 + e2)) (IntVal e1) (IntVal e2)
 rangeFunc _ _ _        = error "Not Int"
 
 printFunc :: [Value] -> String
 printFunc [] = ""
-printFunc (x:[])         = printValue x
+printFunc [x]            = printValue x
 printFunc (x:xs)         = printValue x ++ " " ++ printFunc xs
 
 printValue :: Value -> String
@@ -125,7 +125,7 @@ printValue (ListVal x)   = "[" ++ getListValue x ++ "]"
 
 getListValue :: [Value] -> String
 getListValue [] = ""
-getListValue (x:[])      = printValue x
+getListValue [x]         = printValue x
 getListValue (x:xs)      = printValue x ++ ", " ++ getListValue xs
 
 -- Main functions of interpreter
@@ -168,27 +168,60 @@ eval (List (x:xs)) =
         (ListVal zs) -> return (ListVal (y:zs))
         _            -> error "List Error"
     }
-eval (Compr exp ((CCFor vn c):cs)) = 
+eval (Compr e []) = 
   do
-    {
-      e <- eval c;
-      case e of
-        ListVal e' -> let compList x = [withBinding vn x (eval (Compr exp cs))]
-                      in fmap ListVal (linkComp (concat $ map compList e'))
-        _          -> abort (EBadArg "CCFor Error: CCFor VName (List [Exp])")
-    }
-eval (Compr exp ((CCIf c):cs)) = 
-  do
-    {
-      e <- eval c;
-      if truthy e
-        then eval (Compr exp cs)
+    re<-eval e
+    return (ListVal [re])
+
+eval (Compr e ((CCFor vn exp):cs)) = 
+  do{
+    ex<-eval exp;
+    let ex1= ex in
+      if isListVal ex1
+        then
+          if cs /= []
+            then
+              let (e1:es1)=extractList ex1 in
+                do
+                  ere <- withBinding vn e1 (eval (Compr e cs))
+                  ere1 <-eval (Compr e (CCFor vn (Const (ListVal es1)):cs))
+                  return (ListVal (extractList ere++extractList ere1))
+            else
+              do
+                re<-eval e
+                return (ListVal [re])
+        else
+          return (ListVal [])
+
+  }
+eval (Compr e ((CCIf exp):cs)) = 
+  do{
+    ex<-eval exp;
+    if cs /= []
+      then
+        if truthy ex 
+          then
+            eval (Compr e cs)
+          else
+            return (ListVal [])
       else
-        return (ListVal [])
-    }
-linkComp :: [Comp Value] -> Comp [Value]
-linkComp []     = return [] :: Comp [Value]
-linkComp (x:xs) = pure (:) <*> x <*> (linkComp xs)
+        if truthy ex 
+          then
+            do
+              re<-eval e
+              return (ListVal [re])
+          else
+            return (ListVal [])
+        
+        
+  }
+isListVal :: Value -> Bool
+isListVal (ListVal (x:xs)) = True
+isListVal _ = False
+
+extractList :: Value -> [Value]
+extractList (ListVal x) = x
+extractList x = []
 
 exec :: Program -> Comp ()
 exec [] = return mempty
@@ -207,6 +240,6 @@ exec ((SExp e):xs) =
 
 execute :: Program -> ([String], Maybe RunError)
 execute x = 
-  case (fst (runComp (exec x) [])) of
+  case fst (runComp (exec x) []) of
     (Right _) -> (snd (runComp (exec x) []), Nothing)
     (Left y)  -> (snd (runComp (exec x) []), Just y)
