@@ -170,36 +170,23 @@ eval (List (x:xs)) =
     }
 
 eval (Compr _ []) = return (ListVal [])
-eval (Compr e ((CCFor vn exp):cs)) = 
-  do{
-    ex<-eval exp;
-    let ex1= ex in
-      if isListVal ex1
-        then
-          if cs /= []
-            then
-              let (e1:es1)=extractList ex1 in
-                do
-                  ere <- withBinding vn e1 (eval (Compr e (cs)))
-                  ere1 <-eval (Compr e ((CCFor vn (Const (ListVal es1))):cs))
-                  return (ListVal (ere:(extractList ere1)))  --连接的工作就得要有循环才行，没有循环甚至list comprehension就没有意义了
-            else
-              do
-                re<-eval e
-                return re--到底了该算算e的表达式了
-        else
-          return NoneVal --这里要抛出错误
-
-  }
-eval (Compr e ((CCIf exp):cs)) = 
-  do{
-    ex<-eval exp;
-    if truthy ex 
-      then
-        eval (Compr e cs)
+eval (Compr exp ((CCFor vn c):cs)) = 
+  do
+    {
+      e <- eval c;
+      case e of
+        ListVal e' -> concat $ map (\x -> withBinding vn x (eval (Compr e cs))) e'
+        _          -> abort (EBadArg "CCFor Error: CCFor VName (List [Exp])")
+    }
+eval (Compr exp ((CCIf c):cs)) = 
+  do
+    {
+      e <- eval c;
+      if truthy e
+        then eval (Compr exp cs)
       else
         return (ListVal [])
-  }
+    }
 
 
 isListVal :: Value -> Bool
