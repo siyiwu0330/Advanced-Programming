@@ -4,19 +4,33 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 
-name:           arithmetic
+name:           boa
 version:        0.0.0
 build-type:     Simple
 
 library
   exposed-modules:
-      Arithmetic
-      Definitions
+      BoaAST
+      BoaInterp
   other-modules:
-      Paths_arithmetic
+      Paths_boa
   hs-source-dirs:
       src
   ghc-options: -W
+  build-depends:
+      base
+    , containers
+  default-language: Haskell2010
+
+executable boa
+  main-is: Main.hs
+  other-modules:
+      BoaAST
+      BoaInterp
+      Paths_boa
+  hs-source-dirs:
+      src
+      app
   build-depends:
       base
     , containers
@@ -26,14 +40,12 @@ test-suite my-test-suite
   type: exitcode-stdio-1.0
   main-is: Test.hs
   other-modules:
-      Arithmetic
-      Definitions
-      Paths_arithmetic
+      Paths_boa
   hs-source-dirs:
       tests
   build-depends:
-      arithmetic
-    , base
+      base
+    , boa
     , containers
     , tasty
     , tasty-hunit
