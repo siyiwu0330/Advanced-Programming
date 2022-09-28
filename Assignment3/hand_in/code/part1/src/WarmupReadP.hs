@@ -8,7 +8,7 @@ module WarmupReadP where
 --   tokens may be separated by arbtrary whitespace (spaces, tabs, newlines).
 
 -- Rewritten grammar, without left-recursion:
---   E  ::= TE'
+--   E  ::= TE' | "-" T
 --   E' ::= "+" TE' | "-" TE' | ε
 --   T  ::= num | "(" E ")"
 
@@ -75,22 +75,29 @@ name = token (do c <- letter
 -- parseString = e >> token eof
 
 e, t :: Parser Exp
-e = do tv <- t
-       e' tv
+e =     (do tv <- t
+            e' tv)
+    +++ (do symbol "-"
+            tv <- t
+            e' (Negate (tv)))
 e' :: Exp -> Parser Exp
 e' inval = 
-       (do symbol "+"
-           tv <- t
-           e' (Add (inval) (tv)))
-   <|> (do symbol "-"
-           tv <- t
-           e' (Negate (tv)))
-   <|> return inval
+        (do symbol "+"
+            tv <- t
+            e' (Add (inval) (tv)))
+    +++ (do symbol "-"
+            tv <- t
+            e' (Add (inval) (Negate (tv))))
+    -- +++ (do symbol _
+    --         抛出错误)
+    +++ return inval
 t = intNum
-   <|> (do symbol "("
-           ev <- e
-           symbol ")"
-           return ev)
+    +++ (do symbol "("
+            ev <- e
+            symbol ")"
+            return ev)
 
 parseString :: String -> Either ParseError Exp
-parseString = undefined
+parseString str = case (readP_to_S e ) str of
+  [] -> Left "Parsing error"
+  _  -> Right (fst (last ((readP_to_S e ) str)))
