@@ -30,12 +30,12 @@ version :: Version
 version = Version [0,0,0] []
 bindir, libdir, dynlibdir, datadir, libexecdir, sysconfdir :: FilePath
 
-bindir     = "D:\\Study\\AP\\Github\\Advanced-Programming\\Assignment3\\hand_in\\code\\part2\\.stack-work\\install\\82a24295\\bin"
-libdir     = "D:\\Study\\AP\\Github\\Advanced-Programming\\Assignment3\\hand_in\\code\\part2\\.stack-work\\install\\82a24295\\lib\\x86_64-windows-ghc-9.0.2\\boa-0.0.0-GgtCT9TBUlz5TpNKsSBsoE-boa"
-dynlibdir  = "D:\\Study\\AP\\Github\\Advanced-Programming\\Assignment3\\hand_in\\code\\part2\\.stack-work\\install\\82a24295\\lib\\x86_64-windows-ghc-9.0.2"
-datadir    = "D:\\Study\\AP\\Github\\Advanced-Programming\\Assignment3\\hand_in\\code\\part2\\.stack-work\\install\\82a24295\\share\\x86_64-windows-ghc-9.0.2\\boa-0.0.0"
-libexecdir = "D:\\Study\\AP\\Github\\Advanced-Programming\\Assignment3\\hand_in\\code\\part2\\.stack-work\\install\\82a24295\\libexec\\x86_64-windows-ghc-9.0.2\\boa-0.0.0"
-sysconfdir = "D:\\Study\\AP\\Github\\Advanced-Programming\\Assignment3\\hand_in\\code\\part2\\.stack-work\\install\\82a24295\\etc"
+bindir     = "D:\\Project\\Advanced-Programming\\Assignment3\\hand_in\\code\\part2\\.stack-work\\install\\341e2831\\bin"
+libdir     = "D:\\Project\\Advanced-Programming\\Assignment3\\hand_in\\code\\part2\\.stack-work\\install\\341e2831\\lib\\x86_64-windows-ghc-9.0.2\\boa-0.0.0-GgtCT9TBUlz5TpNKsSBsoE-boa"
+dynlibdir  = "D:\\Project\\Advanced-Programming\\Assignment3\\hand_in\\code\\part2\\.stack-work\\install\\341e2831\\lib\\x86_64-windows-ghc-9.0.2"
+datadir    = "D:\\Project\\Advanced-Programming\\Assignment3\\hand_in\\code\\part2\\.stack-work\\install\\341e2831\\share\\x86_64-windows-ghc-9.0.2\\boa-0.0.0"
+libexecdir = "D:\\Project\\Advanced-Programming\\Assignment3\\hand_in\\code\\part2\\.stack-work\\install\\341e2831\\libexec\\x86_64-windows-ghc-9.0.2\\boa-0.0.0"
+sysconfdir = "D:\\Project\\Advanced-Programming\\Assignment3\\hand_in\\code\\part2\\.stack-work\\install\\341e2831\\etc"
 
 getBinDir, getLibDir, getDynLibDir, getDataDir, getLibexecDir, getSysconfDir :: IO FilePath
 getBinDir = catchIO (getEnv "boa_bindir") (\_ -> return bindir)

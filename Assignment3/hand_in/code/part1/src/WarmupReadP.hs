@@ -45,15 +45,6 @@ symbol = token . string
 schar :: Char -> Parser Char
 schar = token . char
 
-name :: Parser String
-name = token (do c <- letter
-                 cs <- letdigs
-                 return (c:cs))
-     where letter = satisfy isLetter
-           letdigs = many (letter <|> num)
-           num = satisfy isDigit
-
-
 -- e  =  do t
 --          e'
 --          return ()
@@ -77,7 +68,7 @@ name = token (do c <- letter
 e, t :: Parser Exp
 e =     (do tv <- t
             e' tv)
-    +++ (do symbol "-"
+    <++ (do symbol "-"
             tv <- t
             e' (Negate (tv)))
 e' :: Exp -> Parser Exp
@@ -85,19 +76,19 @@ e' inval =
         (do symbol "+"
             tv <- t
             e' (Add (inval) (tv)))
-    +++ (do symbol "-"
+    <++ (do symbol "-"
             tv <- t
             e' (Add (inval) (Negate (tv))))
-    -- +++ (do symbol _
-    --         抛出错误)
-    +++ return inval
+    <++ return inval
 t = intNum
-    +++ (do symbol "("
+    <++ (do symbol "("
             ev <- e
             symbol ")"
             return ev)
 
 parseString :: String -> Either ParseError Exp
-parseString str = case (readP_to_S e ) str of
-  [] -> Left "Parsing error"
-  _  -> Right (fst (last ((readP_to_S e ) str)))
+parseString str = case (readP_to_S e) str of
+    [] -> Left "Parsing error"
+    _  -> case [x | x <- readP_to_S e str, snd x == ""] of
+        [] -> Left "Parsing error"
+        _  -> Right (fst (last ((readP_to_S e) str)))

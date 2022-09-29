@@ -21,11 +21,14 @@ spaces1 = many1 space
 
 token :: Parser a -> Parser a
 token p = spaces >> p
+token' :: Parser a -> Parser a
+token' p = comment >> p
 
 symbol :: String -> Parser String
 symbol = token . string
 schar :: Char -> Parser Char
 schar = token . char
+
 
 reserved :: [String]
 reserved = ["None", "True", "False", "for", "if", "in", "not"]
@@ -42,11 +45,17 @@ program = stmts
 --                 Stmts
 --                 return ())
 stmts :: Parser [Stmt]
-stmts            =   do st <- stmt
-                        return [st]
-                <++ (do st <- stmt
+stmts             = (do comment
+                        st <- stmt
+                        comment
+                        return [st])
+                <++ (do comment
+                        st <- stmt
+                        comment
                         symbol ";"
+                        comment
                         ss <- stmts
+                        comment
                         return (st:ss))
 
 -- Stmt      = (do ident
@@ -56,12 +65,13 @@ stmts            =   do st <- stmt
 --         <|> (do Expr
 --                 return ())
 stmt :: Parser Stmt
-stmt              = (do id <- ident
+stmt              = (do spaces
+                        id <- ident
                         symbol "="
                         er <- expr
                         return (SDef id er))
-                <++ (do er <- expr
-                        return (SExp er))
+                <++ (do spaces
+                        fmap (\x -> (SExp x)) expr)
 
 -- Expr      = (do numConst
 --                 return ())
@@ -101,8 +111,6 @@ stmt              = (do id <- ident
 --                 Clausez
 --                 symbol "]"
 --                 return ())
-expr :: Parser Exp
-expr              = oper
 
 -- Oper      = (do symbol "+"
 --                 return ())
@@ -131,6 +139,9 @@ expr              = oper
 --         <|> (do symbol "not"
 --                 symbol "in"
 --                 return ())
+expr :: Parser Exp
+expr              = token oper
+
 oper :: Parser Exp
 oper              = (do e1 <- oper1
                         symbol "=="
@@ -175,10 +186,10 @@ oper1             = (do e <- oper2
 oper1' :: Exp -> Parser Exp
 oper1' inval      = (do symbol "+"
                         e <- oper2
-                        return (Oper Plus inval e))
+                        oper1' (Oper Plus inval e))
                 <++ (do symbol "-"
                         e <- oper2
-                        return (Oper Minus inval e))
+                        oper1' (Oper Minus inval e))
                 <++ return inval
 
 oper2 :: Parser Exp
@@ -189,13 +200,13 @@ oper2             = (do e <- oper3
 oper2' :: Exp -> Parser Exp
 oper2' inval      = (do symbol "*"
                         e <- oper3
-                        return (Oper Times inval e))
+                        oper2' (Oper Times inval e))
                 <++ (do symbol "//"
                         e <- oper3
-                        return (Oper Div inval e))
+                        oper2' (Oper Div inval e))
                 <++ (do symbol "%"
                         e <- oper3
-                        return (Oper Mod inval e))
+                        oper2' (Oper Mod inval e))
                 <++ return inval
 
 oper3 :: Parser Exp
@@ -269,14 +280,14 @@ clausez           = (return [])
                 <++ (do ic <- ifClause
                         cz <- clausez
                         return (ic:cz))
+                <++ return []
 
 -- Exprz     = (return ())
 --         <|> (do Exprs
 --                 return ())
 exprz :: Parser [Exp]
-exprz             = (return [])
-                <++ (do es <- exprs
-                        return es)
+exprz             = return []
+                <++ exprs
 
 -- Exprs     = (do Expr
 --                 return ())
@@ -300,8 +311,8 @@ name :: Parser String
 name = token (do c <- letter
                  cs <- letdigs
                  return (c:cs))
-     where letter = satisfy isLetter
-           letdigs = many (letter <|> num)
+     where letter = satisfy (\c -> isLetter c || c == '_')
+           letdigs = many (letter <|> num <|> satisfy (\x -> x == '_'))
            num = satisfy isDigit
 nameOrKeyword :: Parser (Either Keyword String)
 nameOrKeyword  = do n <- name
@@ -311,7 +322,7 @@ ident :: Parser String
 ident             =  token  (do nok <- nameOrKeyword
                                 case nok of
                                     (Right id) -> return id
-                                    (Left _)  -> fail "It's a Keyword")
+                                    (Left _)  -> fail "Keyword Error")
 
 -- LegalNum      ::= "-" Digits | Digits
 -- Digits        ::= Digit | NoneZeroDigit Digits | Digit Digits 
@@ -337,15 +348,17 @@ numConst          =  do x <- option ' ' (char '-')
 
 stringConst :: Parser String
 stringConst       =  do schar '\''
-                        c <- isString
+                        s <- isString
                         char '\''
-                        return c
+                        return s
                 where isString = many (satisfy isPrint)
 
-                    
--- stringConst       = token (do cs <- letters
---                               return cs)
---                     where letters = many (satisfy isPrint)
+comment :: Parser String
+comment           = (do symbol "#"
+                        com <- munch (\x -> x /= '\n')
+                        symbol "\n"
+                        return com)
+                <++ return ""
 
 
 
