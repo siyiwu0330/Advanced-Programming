@@ -6,7 +6,7 @@ This is the set of assignments for UCPU Advanced Programming course 2022. The ma
 
 ### Assignment 1
 
-| Question No.                      | Function Name | Completion (○/△/×) |
+| Class of Function                 | Function Name | Completion (○/△/×) |
 | --------------------------------- | ------------- |:------------------ |
 | Printing expressions              | showExp       | ○                  |
 | Evaluating expressions            | evalSimple    | ○                  |
@@ -21,7 +21,7 @@ This is the set of assignments for UCPU Advanced Programming course 2022. The ma
 
 ### Assignment 2
 
-| Question No.          | Function Name | Completion (○/△/×) |
+| Class of Function     | Function Name | Completion (○/△/×) |
 | --------------------- | ------------- |:------------------ |
 | Monad operations      | abort         | ○                  |
 | Monad operations      | look          | ○                  |
@@ -35,3 +35,21 @@ This is the set of assignments for UCPU Advanced Programming course 2022. The ma
 | Interpreter functions | execute       | ○                  |
 
 **Note:** There is a problem with the Compr pattern matching in the eval function and it does not fully pass OnlineTA
+
+### Assignment 3
+
+| Class of Function   | Function Name   | Completion (○/△/×) |
+| ------------------- | --------------- |:------------------ |
+| main function       | parseString     | ○                  |
+| Program             | rpProgram       | ○                  |
+| Stmts               | rpStmts         | ○                  |
+| Stmt                | rpStmt          | ○                  |
+| Expr                | operExp         | △                  |
+| ident               | rpIdent         | ○                  |
+| numConst            | concreteOperExp | ○                  |
+| stringConst         | concreteOperExp | ○                  |
+| Auxiliary functions | token           | ○                  |
+| Auxiliary functions | extractIdent    | ○                  |
+| Auxiliary functions | rpComment       | ○                  |
+
+**Note:**  There is a problem with the parsing of deep brackets, etc., and 7 timeouts appear in OnlineTA. In addition, the parsing of the parentheses directly after the keyword is different from the requirements of OnlineTA. The specific reason for the error is that our program specifies that the keyword must be separated by a space, e.g. **"notx"** would not be recognized as **Not (Var "x")** but as **Var "notx"** as a **Var**. however, it happens when the keywords immediately followed by parentheses(**"()"** or **"[]"**). OnlineTA tells us that **"not(x)"** should be correctly recognized as **Not ( Var "x")**, but since our program need a space after the keyword, such a situation is not allowed, and the program will return an error.
