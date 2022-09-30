@@ -13,7 +13,7 @@ module WarmupReadP where
 --   T  ::= num | "(" E ")"
 
 import Text.ParserCombinators.ReadP
-import Control.Applicative ((<|>))
+import Control.Applicative ()
   -- may use instead of +++ for easier portability to Parsec
 
 import Data.Char
@@ -66,29 +66,39 @@ schar = token . char
 -- parseString = e >> token eof
 
 e, t :: Parser Exp
-e =     (do tv <- t
+e =     (do skipSpaces
+            tv <- t
+            skipSpaces
             e' tv)
     <++ (do symbol "-"
+            skipSpaces
             tv <- t
-            e' (Negate (tv)))
+            skipSpaces
+            e' (Negate tv))
 e' :: Exp -> Parser Exp
 e' inval = 
         (do symbol "+"
+            skipSpaces
             tv <- t
-            e' (Add (inval) (tv)))
+            skipSpaces
+            e' (Add inval tv))
     <++ (do symbol "-"
+            skipSpaces
             tv <- t
-            e' (Add (inval) (Negate (tv))))
+            skipSpaces
+            e' (Add inval (Negate tv)))
     <++ return inval
 t = intNum
     <++ (do symbol "("
+            skipSpaces
             ev <- e
             symbol ")"
+            skipSpaces
             return ev)
 
 parseString :: String -> Either ParseError Exp
-parseString str = case (readP_to_S e) str of
-    [] -> Left "Parsing error"
-    _  -> case [x | x <- readP_to_S e str, snd x == ""] of
-        [] -> Left "Parsing error"
-        _  -> Right (fst (last ((readP_to_S e) str)))
+parseString str = case readP_to_S e str of
+  [] -> Left "Parsing Error"
+  _  -> case snd (last (readP_to_S e str)) of
+    "" -> Right (fst (last (readP_to_S e str)))
+    _  -> Left "Invalid Input"

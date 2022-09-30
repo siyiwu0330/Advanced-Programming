@@ -3,367 +3,355 @@
 module BoaParser (ParseError, parseString) where
 
 import BoaAST
-import Text.ParserCombinators.ReadP
 import Data.Char
-import Control.Applicative ((<|>))
+import Control.Applicative
+import Text.ParserCombinators.ReadP
 -- add any other other imports you need
-
-type Parser a = ReadP a
 
 type ParseError = String -- you may replace this
 
-space :: Parser Char
-space = satisfy isSpace
-spaces :: Parser String
-spaces = many space
-spaces1 :: Parser String
-spaces1 = many1 space
+parseString :: String -> Either ParseError Program
+parseString str = case readP_to_S rpProgram str of
+  [] -> Left "Parsing Error"
+  _  -> case snd (last (readP_to_S rpProgram str)) of
+    "" -> Right (fst (last (readP_to_S rpProgram str)))
+    _  -> Left "Invalid Input"
 
-token :: Parser a -> Parser a
-token p = spaces >> p
-token' :: Parser a -> Parser a
-token' p = comment >> p
-
-symbol :: String -> Parser String
-symbol = token . string
-schar :: Char -> Parser Char
-schar = token . char
 
 
 reserved :: [String]
 reserved = ["None", "True", "False", "for", "if", "in", "not"]
 
-data Keyword = Keyword String
+-- Main skeleton
 
-program :: Parser Program
-program = stmts
+rpProgram :: ReadP Program
+rpProgram = rpStmts
 
--- Stmts     = (do Stmt
---                 return ())
---         <|> (do Stmt
---                 symbol ";"
---                 Stmts
---                 return ())
-stmts :: Parser [Stmt]
-stmts             = (do comment
-                        st <- stmt
-                        comment
-                        return [st])
-                <++ (do comment
-                        st <- stmt
-                        comment
-                        symbol ";"
-                        comment
-                        ss <- stmts
-                        comment
-                        return (st:ss))
+-- Clean the spaces and comments between statements
+rpStmts :: ReadP [Stmt]
+rpStmts = (do 
+		Text.ParserCombinators.ReadP.many space    
+		Text.ParserCombinators.ReadP.many rpComment
+		Text.ParserCombinators.ReadP.many space
+		stm <- rpStmt
+		Text.ParserCombinators.ReadP.many space
+		Text.ParserCombinators.ReadP.many rpComment
+		Text.ParserCombinators.ReadP.many space
+		token (char ';')
+		stms <- rpStmts
+		return (stm:stms))
+	<++ (do
+		Text.ParserCombinators.ReadP.many space
+		Text.ParserCombinators.ReadP.many rpComment
+		Text.ParserCombinators.ReadP.many space
+		stm <- rpStmt
+		Text.ParserCombinators.ReadP.many space
+		Text.ParserCombinators.ReadP.many rpComment
+		Text.ParserCombinators.ReadP.many space
+		return [stm])
 
--- Stmt      = (do ident
---                 symbol "="
---                 Expr
---                 return ())
---         <|> (do Expr
---                 return ())
-stmt :: Parser Stmt
-stmt              = (do spaces
-                        id <- ident
-                        symbol "="
-                        er <- expr
-                        return (SDef id er))
-                <++ (do spaces
-                        fmap (\x -> (SExp x)) expr)
+rpStmt :: ReadP Stmt
+rpStmt = (do
+	ident <- token rpIdent
+	token (char '=')
+	opex <- token operExp
+	return (SDef (extractIdent ident) opex))
+	<++ (do
+		opex <- token operExp
+		return (SExp opex))
 
--- Expr      = (do numConst
---                 return ())
---         <|> (do stringConst
---                 return ())
---         <|> (do symbol "None"
---                 return ())
---         <|> (do symbol "True"
---                 return ())
---         <|> (do symbol "False"
---                 return ())
---         <|> (do ident
---                 return ())
---         <|> (do Expr
---                 Oper
---                 Expr
---                 return ())
---         <|> (do symbol "not"
---                 Expr
---                 return ())
---         <|> (do symbol "("
---                 Expr
---                 symbol ")"
---                 return ())
---         <|> (do ident
---                 symbol "("
---                 Exprz
---                 symbol ")"
---                 return ())
---         <|> (do symbol "["
---                 Exprz
---                 symbol "]"
---                 return ())
---         <|> (do symbol "["
---                 Expr
---                 ForClause
---                 Clausez
---                 symbol "]"
---                 return ())
 
--- Oper      = (do symbol "+"
---                 return ())
---         <|> (do symbol "-"
---                 return ())
---         <|> (do symbol "*"
---                 return ())
---         <|> (do symbol "//"
---                 return ())
---         <|> (do symbol "%"
---                 return ())
---         <|> (do symbol "=="
---                 return ())
---         <|> (do symbol "!="
---                 return ())
---         <|> (do symbol "<"
---                 return ())
---         <|> (do symbol "<="
---                 return ())
---         <|> (do symbol ">"
---                 return ())
---         <|> (do symbol ">="
---                 return ())
---         <|> (do symbol "in"
---                 return ())
---         <|> (do symbol "not"
---                 symbol "in"
---                 return ())
-expr :: Parser Exp
-expr              = token oper
+operExp :: ReadP Exp
+operExp = outerOperExp
 
-oper :: Parser Exp
-oper              = (do e1 <- oper1
-                        symbol "=="
-                        e2 <- oper1
-                        return (Oper Eq e1 e2))
-                <++ (do e1 <- oper1
-                        symbol "<"
-                        e2 <- oper1
-                        return (Oper Less e1 e2))
-                <++ (do e1 <- oper1
-                        symbol ">"
-                        e2 <- oper1
-                        return (Oper Greater e1 e2))
-                <++ (do e1 <- oper1
-                        symbol "in"
-                        e2 <- oper1
-                        return (Oper In e1 e2))
-                <++ (do e1 <- oper1
-                        symbol "!="
-                        e2 <- oper1
-                        return (Not (Oper Eq e1 e2)))
-                <++ (do e1 <- oper1
-                        symbol "<="
-                        e2 <- oper1
-                        return (Not (Oper Greater e1 e2)))
-                <++ (do e1 <- oper1
-                        symbol ">="
-                        e2 <- oper1
-                        return (Not (Oper Less e1 e2)))
-                <++ (do e1 <- oper1
-                        symbol "not"
-                        symbol "in"
-                        e2 <- oper1
-                        return (Not (Oper In e1 e2)))
-                <++ oper1
+outerOperExp :: ReadP Exp
+outerOperExp = (do
+		token (string "not ")
+		e <- operExp
+		return (Not e))
+	<++ (do
+		token (string "not")
+		token (char '(')
+		e <- operExp
+		token (char ')')
+		return (Not e))
+	<++ (do
+		token (string "not")
+		Text.ParserCombinators.ReadP.many1 rpComment
+		e <- operExp
+		return (Not e))
+	<++ (do
+		e1 <- intermediateOperExp
+		token (string "==")
+		e2 <- intermediateOperExp
+		return (Oper Eq e1 e2))
+	<++ (do
+		e1 <- intermediateOperExp
+		token (string "!=")
+		e2 <- intermediateOperExp
+		;return (Not (Oper Eq e1 e2)))
+	<++ (do
+		e1 <- intermediateOperExp
+		token (char '<')
+		e2 <- intermediateOperExp
+		return (Oper Less e1 e2))
+	<++ (do
+		e1 <- intermediateOperExp
+		token (string "<=")
+		e2 <- intermediateOperExp
+		return (Not (Oper Greater e1 e2)))
+	<++ (do
+		e1 <- intermediateOperExp
+		token (char '>')
+		e2 <- intermediateOperExp
+		return (Oper Greater e1 e2))
+	<++ (do
+		e1 <- intermediateOperExp
+		token (string ">=")
+		e2 <- intermediateOperExp
+		return (Not (Oper Less e1 e2)))
+	<++ (do 
+		e1 <- intermediateOperExp
+		many1 space -- this and next lines are not equal to token (string " in ")
+		token (string "in ")
+		e2 <- intermediateOperExp
+		return (Oper In e1 e2))
+	<++ (do
+		e1 <- intermediateOperExp
+		token (string "not ")
+		token (string "in ")
+		e2 <- intermediateOperExp
+		return (Not (Oper In e1 e2)))
+	<++ intermediateOperExp
 
-oper1 :: Parser Exp
-oper1             = (do e <- oper2
-                        oper1' e)
-                <++ oper2
+intermediateOperExp :: ReadP Exp
+intermediateOperExp = (do
+		e1 <- innerOperExp
+		intermediateOperExpHelper e1)
+	<++ innerOperExp
 
-oper1' :: Exp -> Parser Exp
-oper1' inval      = (do symbol "+"
-                        e <- oper2
-                        oper1' (Oper Plus inval e))
-                <++ (do symbol "-"
-                        e <- oper2
-                        oper1' (Oper Minus inval e))
-                <++ return inval
+-- Using helper funciton to realize left association
+intermediateOperExpHelper :: Exp -> ReadP Exp
+intermediateOperExpHelper e1 = ( do
+		token (char '+')
+		e2 <- innerOperExp
+		intermediateOperExpHelper (Oper Plus e1 e2))
+	<++ ( do 
+		token (char '-')
+		e2 <- innerOperExp
+		intermediateOperExpHelper (Oper Minus e1 e2))
+	<++ return e1
 
-oper2 :: Parser Exp
-oper2             = (do e <- oper3
-                        oper2' e)
-                <++ oper3
+innerOperExp :: ReadP Exp
+innerOperExp = (do
+		e1 <- concreteOperExp
+		innerOperExpHelper e1)
+	<++ concreteOperExp
 
-oper2' :: Exp -> Parser Exp
-oper2' inval      = (do symbol "*"
-                        e <- oper3
-                        oper2' (Oper Times inval e))
-                <++ (do symbol "//"
-                        e <- oper3
-                        oper2' (Oper Div inval e))
-                <++ (do symbol "%"
-                        e <- oper3
-                        oper2' (Oper Mod inval e))
-                <++ return inval
+-- Using helper funciton to realize left association
+innerOperExpHelper :: Exp -> ReadP Exp
+innerOperExpHelper e1 = ( do
+		token (char '*')
+		e2 <- concreteOperExp
+		innerOperExpHelper (Oper Times e1 e2))
+	<++ ( do 
+		token (string "//")
+		e2 <- concreteOperExp
+		innerOperExpHelper (Oper Div e1 e2))
+	<++ ( do 
+		token (char '%')
+		e2 <- concreteOperExp
+		innerOperExpHelper (Oper Mod e1 e2))
+	<++ return e1
 
-oper3 :: Parser Exp
-oper3             = (do num <- numConst
-                        return (Const (IntVal num)))
-                <++ (do str <- stringConst
-                        return (Const (StringVal str)))
-                <++ (do symbol "None"
-                        return (Const NoneVal))
-                <++ (do symbol "True"
-                        return (Const TrueVal))
-                <++ (do symbol "False"
-                        return (Const FalseVal))
-                <++ (do id <- ident
-                        return (Var id))
-                <++ (do symbol "not"
-                        er <- expr
-                        return (Not er))
-                <++ (do symbol "("
-                        er <- expr
-                        symbol ")"
-                        return er)
-                <++ (do id <- ident
-                        symbol "("
-                        ez <- exprz
-                        symbol ")"
-                        return (Call id ez))
-                <++ (do symbol "["
-                        ez <- exprz
-                        symbol "]"
-                        return (List ez))
-                <++ (do symbol "["
-                        er <- expr
-                        fc <- forClause
-                        cz <- clausez
-                        symbol "]"
-                        return (Compr er (fc:cz)))
+concreteOperExp :: ReadP Exp
+concreteOperExp = (do
+		s <- skipSpaces *> subtractChar
+		ss <- many1 digit <* skipSpaces;
+		if head ss == '0' && length ss > 1
+		then 
+			fail "leading zero"
+		else
+			return  (BoaAST.Const (IntVal (read (s:ss) ::Int))))
+	<++ (do
+		s <- skipSpaces *> many1 digit <* skipSpaces;
+		if head s == '0' && length s > 1
+			then 
+				fail "leading zero"
+			else
+				return  (BoaAST.Const (IntVal (read s ::Int))))
+	<++ (do
+		char '\''
+		grossContent <- Text.ParserCombinators.ReadP.many (
+			stringChar
+			<|> (do
+				string "\\n"
+				return '\n')
+			<|> (do 
+				string "\\\n"
+				return '\0')
+			<|> (do 
+				string "\\\\"
+				return '\\')
+			<|> (do 
+				string "\\'"
+				return '\'')) 
+		char '\'';
+		let purifiedContent = filter (`notElem` "\NUL") grossContent in
+			return (BoaAST.Const (StringVal purifiedContent)))
+	<++ (do 
+		token (string "None")
+		return (BoaAST.Const NoneVal))
+	<++ (do
+		token (string "True")
+		return (BoaAST.Const TrueVal))
+	<++ (do
+		token (string "False")
+		return (BoaAST.Const FalseVal))
+	<++ (do
+		fNameVar <- token rpIdent
+		token (char '(')
+		opez <- concreteOperExpz
+		token (char ')')
+		return (Call (extractIdent fNameVar) opez))
+	<++ rpIdent
+	<++ (do
+		token (char '(')
+		token (char '(')
+		ope <- operExp
+		token (char ')')
+		token (char ')')
+		return ope)
+	<++ (do
+		token (char '(')
+		ope <- operExp
+		token (char ')')
+		return ope)
+	<++ (do
+		token (char '[')
+		token (char '[')		
+		opez <- concreteOperExpz
+		token (char ']')
+		token (char ']')
+		return (List opez))
+	<++ (do
+		token (char '[')
+		opez <- concreteOperExpz
+		token (char ']')
+		return (List opez))
+	<++ (do 
+		token (char '[')
+		ope <- operExp
+		many1 space
+		token (string "for ")
+		ident <- token rpIdent
+		token (string "in ")
+		exp <- operExp
+		cz <- rpClausez
+		token (char ']')
+		return (Compr ope (CCFor (extractIdent ident) exp:cz)))
 
--- ForClause =  do symbol "for"
---                 ident
---                 symbol "in"
---                 Expr
---                 return ()
-forClause :: Parser CClause
-forClause         =  do symbol "for"
-                        id <- ident
-                        symbol "in"
-                        er <- expr
-                        return (CCFor id er)
 
--- IfClause  =  do symbol "if"
---                 Expr
---                 return ()
-ifClause :: Parser CClause
-ifClause          =  do symbol "if"
-                        er <- expr
-                        return (CCIf er)
+concreteOperExpz :: ReadP [Exp]
+concreteOperExpz = concreteOperExps
+	<++ (do return [])
 
--- Clausez   = (return ())
---         <|> (do ForClause
---                 Clausez
---                 return ())
---         <|> (do IfClause
---                 Clausez
---                 return ())
-clausez :: Parser [CClause]
-clausez           = (return [])
-                <++ (do fc <- forClause
-                        cz <- clausez
-                        return (fc:cz))
-                <++ (do ic <- ifClause
-                        cz <- clausez
-                        return (ic:cz))
-                <++ return []
+concreteOperExps :: ReadP [Exp]
+concreteOperExps = (do
+		e <- operExp
+		token (char ',')
+		es <- concreteOperExps
+		return (e:es))
+	<++ (do
+		e <- operExp
+		return [e])
 
--- Exprz     = (return ())
---         <|> (do Exprs
---                 return ())
-exprz :: Parser [Exp]
-exprz             = return []
-                <++ exprs
+rpClausez :: ReadP [CClause]
+rpClausez = (do 
+		many1 space
+		token (string "for ")
+		ident <- token rpIdent
+		token (string "in ")
+		exp <- operExp
+		cs <- rpClausez
+		return (CCFor (extractIdent ident) exp:cs))
+	<++ (do
+		token (string "if ")
+		exp <- operExp
+		cs <- rpClausez
+		return (CCIf exp:cs))
+	<++ (do return [])
 
--- Exprs     = (do Expr
---                 return ())
---         <|> (do Expr
---                 symbol ","
---                 Exprs
---                 return ())
-exprs :: Parser [Exp]
-exprs             = (do er <- expr
-                        return [er])
-                <++ (do er <- expr
-                        symbol ","
-                        es <- exprs
-                        return (er:es))
 
--- Name    ::= Letter Letdigs 
--- Letdigs ::= Letter Letdigs | Digit Letdigs | ε 
--- Letter  ::= "A" | ... | "Z" | "a" | ... | "z" 
--- Digit   ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" 
-name :: Parser String
-name = token (do c <- letter
-                 cs <- letdigs
-                 return (c:cs))
-     where letter = satisfy (\c -> isLetter c || c == '_')
-           letdigs = many (letter <|> num <|> satisfy (\x -> x == '_'))
-           num = satisfy isDigit
-nameOrKeyword :: Parser (Either Keyword String)
-nameOrKeyword  = do n <- name
-                    if n `elem` reserved then return (Left(Keyword n))
-                    else return (Right n)
-ident :: Parser String
-ident             =  token  (do nok <- nameOrKeyword
-                                case nok of
-                                    (Right id) -> return id
-                                    (Left _)  -> fail "Keyword Error")
+rpIdent :: ReadP Exp
+rpIdent = do 
+    c <- letter'
+    cs <- letdigs ;
+		if (c:cs) `notElem` reserved
+            then
+                return (Var (c:cs))
+            else 
+                fail "Cannot use reserved words as an identifier"
+    where letter' = letter <|> underScore ;
+           letdigs = Text.ParserCombinators.ReadP.many (alphaNum <|> underScore)
 
--- LegalNum      ::= "-" Digits | Digits
--- Digits        ::= Digit | NoneZeroDigit Digits | Digit Digits 
--- Digit         ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" 
--- NoneZeroDigit ::= "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" 
--- numConst :: Parser Int
--- numConst          = token ( (do ds <- digits
---                                 nzd <- noneZeroDigit
---                                 return $ read $ [nzd] ++ ds)
---                         <++ (do char '-'
---                                 ds <- digits
---                                 nzd <- noneZeroDigit
---                                 return $ read $ "-" ++ [nzd] ++ ds))
---                     where digits = many (satisfy isDigit);
---                           noneZeroDigit = satisfy (\x -> x `elem` ['1'..'9'])
-numConst :: Parser Int
-numConst          =  do x <- option ' ' (char '-')
-                        xs <- munch1 isDigit
-                        if (head xs == '0') && (length xs > 1)
-                            then fail "Num Error"
-                        else
-                            return $ read $ (x:xs)
+-- Helper Functions
 
-stringConst :: Parser String
-stringConst       =  do schar '\''
-                        s <- isString
-                        char '\''
-                        return s
-                where isString = many (satisfy isPrint)
+token :: ReadP a -> ReadP a
+token t = skipSpaces *> t <* skipSpaces
 
-comment :: Parser String
-comment           = (do symbol "#"
-                        com <- munch (\x -> x /= '\n')
-                        symbol "\n"
-                        return com)
-                <++ return ""
+extractIdent :: Exp -> String
+extractIdent (Var str) = str
+extractIdent _         = ""
+
+rpComment :: ReadP String
+rpComment = (do
+	char '#'
+	comment <- munch (/= '\n')
+	char '\n'
+	return comment)
+	<++ (do
+	char '#'
+	munch (/= '\n'))
+
+
+space :: ReadP Char 
+space = satisfy isSpace
+digit :: ReadP Char 
+digit = satisfy isDigit
+letter :: ReadP Char 
+letter = satisfy isLetter
+alphaNum :: ReadP Char 
+alphaNum = satisfy isAlphaNum
+subtractChar :: ReadP Char
+subtractChar = satisfy isSubtract
+stringChar :: ReadP Char
+stringChar = satisfy canPrintChar
+underScore :: ReadP Char
+underScore = satisfy isUnderScore
+-- table :: ReadP Char
+-- table = satisfy isTable
 
 
 
+isSubtract :: Char -> Bool
+isSubtract s = case s of
+  '-' -> True
+  _   -> False
 
-parseString :: String -> Either ParseError Program
-parseString str = case (readP_to_S program) str of
-  [] -> Left "Parsing error"
-  _  -> Right (fst (last ((readP_to_S program) str)))
+isUnderScore :: Char -> Bool
+isUnderScore u = case u of
+  '_' -> True
+  _   -> False
+
+-- isTable :: Char -> Bool
+-- isTable t = case t of
+--   '\t' -> True
+--   _   -> False
+
+canPrintChar :: Char -> Bool
+canPrintChar c = case c of 
+	'\'' -> False
+	'#'  -> True
+	'\\' -> False	
+	_    -> isPrint c

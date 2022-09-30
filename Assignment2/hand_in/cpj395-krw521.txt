@@ -1,0 +1,139 @@
+*** Submission ***
+
+- Problems with packaging/build, as reported by OnlineTA:
+
+  - Please don't modify or delete code/part*/package.yaml
+
+- Some significant or persistent style issues noted by OnlineTA:
+
+  = Several warnings about unused variables in bindings/patterns.
+    Consider using `_varname`, or simply `_`, for variables whose
+    values you deliberately don't use; this helps the compiler help
+    you, by pointing out those few cases in which you actually did
+    mistype the name of a variable and ended up referencing another
+    one than the one you meant.
+
++ You have listings of your code as an appendix in the report. Good!
+
+  = I would prefer a monospacefont. Additionally, I recommend the LaTeX
+    package `minted`.
+
++ You have included a timesheet. Good!
+
+*** Warmup ***
+
++ All our tests pass. Good job!
+
++ Code looks OK.
+
+  = In defining the Monad instance for RWSE, and the RWSE-specific
+    operations, consider how you could exploit that `(Either ErrorData)`
+    is itself a monad, to write the RWSE components more generically,
+    e.g., as
+      `return a = RWSE (\r s -> return (a, mempty, s))`
+    instead of
+      `return a = RWSE (\r s -> Right (a, mempty, s))`.
+    Similarly, in `>>=`, you have a code fragment of the form
+      `case <exp1> of Left e -> Left e; Right p -> <exp2>`
+    which could have been written as simply
+      `do p <- <exp1>; <exp2>`.
+
+    That way, if we were to replace, e.g., `Either ErrorData` with
+    `Maybe` in RWSE, your definitions of the monad components would
+    still work without change.
+
+*** Main task: code ***
+
++ Comp monad instance (return, >>=): fine.
+
++ Comp monad operations (abort, look, withBinding, output): fine.
+
+  + And you are only using those operations in the rest of the program
+    (except for a permitted runComp in `execute`, to finally get out
+    of the monad). Very good! If the definition of Comp were to
+    change, you'll only need to update the definitions here, not in
+    other parts of your code.
+
+  = Instead of your somewhat complicated approach in `look`, consider
+    using the standard function `lookup` for looking up keys in
+    association lists.
+
++ Auxiliary functions (truthy, operate, apply): fine
+
++ Main interpreter functions (eval, exec, execute): fine
+
+  = Instead of the rather backwards `extractList` approach to extracting
+    lists from list values, consider writing a separate (mutually recursive)
+    function where the result is always a list, I suggest the name and type:
+
+    ```
+    evalComprehension :: Exp -> [CClause] -> Comp [Value]
+    ```
+
+*** Main task: testing ***
+
+= Tests are automated, but not runnable by `stack test`.  In particular,
+  code/part2/tests/Test.hs does not compile.
+
+  + Looks reasonably comprehensive.
+
+  = Instead of one long "stubby" test group, consider splitting the tests
+    either by functionality ("monad-instance", "utility-operations",
+    "built-in-functions", etc..) or at least into a group of negative and
+    a group of positive tests.
+
+*** Main task: report ***
+
+  + Reasonable overview of main design/implementation choices.
+
+    = While the assignment text does not ask you to prove that your
+      "instance Monad Comp" actually satisfies the monad laws, it's
+      still considered good style to at least consider the issue
+      in the report, and mention any reasons you have for believing
+      that you have actually defined a "real" monad, and not just
+      some functions with the correct types.
+
+    + Good discussion of the `range` and `print` functionality in
+      `apply`.
+
+  + Very comprehensive and well justified assessment, with a clear
+    explanation of testing strategy and results.
+
+  + Completeness: fine
+
+    + You seem to have implemented all the mandatory parts. Good!
+
+  + Correctness: fine
+
+    + You have some minor correctness issues, but those are clearly
+      identified in the assessment. Good!
+
+    = The warnings from onlineTA, have to do with your code computing
+      unnesseary things. For instance, if the comprehension is of the form
+      `[ <body> if False <more-clauses> ]`, then there is no look at <body>
+      and there is no reason to inspect <more-clauses> either. The list is
+      empty.
+
+  + Efficiency: ...
+
+    = Don't make a table just to make a table. If you want to say something
+      about the complexity, then `look` is O(n) where `n` is the number of
+      bound variables in some execution path. What does such a path look
+      like?  Do we know a persistent data structure that allows lookup
+      faster?
+
+    = This course is not about complexity analysis, so it is fine to say,
+      that an accociation list probably isn't the most efficient choice for
+      variable bindings.
+
+  + Robustness: fine
+
+    + Robustness isn't really a big concern for this assignment, since
+      there isn't much opportunity to invoke the required functions on
+      arguments for which their behavior is not specified.
+
+  + Maintainability: fine
+
+*** Overall score: 4 / 6 ***
+
+Next time, check that your test suite compiles {^o^}!
