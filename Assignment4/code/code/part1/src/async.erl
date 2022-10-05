@@ -1,46 +1,88 @@
 -module(async).
 
--export([new/2, wait/1, poll/1, testFun/1]).
+-export([new/2, poll/1, wait/1, testFun/1, start/0]).
 
-new(Fun, Arg) -> spawn(fun()->
-    Me=self(),
-    spawn(fun()->
-        try 
-            Res=Fun(Arg),
-            Me!{ok,Res}
+new(Fun, Arg) ->
+    spawn(fun() ->
+        Aid = self(),
+        runFun(Fun, Arg, Aid),
+        loop({runing})
+    end).
+
+runFun(Fun, Arg, Aid) ->
+    spawn(fun() ->
+        try Res = Fun(Arg) of
+            _       -> Aid!{ok, Res}
         catch
-            _:Reason->Me!{error,Reason}
+            _:Error -> Aid!{error, Error}
         end
-   end),
-loop({init})
-end
-).
-wait(Aid) -> 
-    case poll(Aid) of 
-        nothing -> wait(Aid);
-        {ok, Res}->Res;
-        {exception,Reason}->throw(Reason)
+    end).
+
+poll(Aid) ->
+    Aid!{poll, self()},
+    receive
+        {ok, Res}      -> {ok, Res};
+        {error, Error} -> {exception, Error};
+        {nothing}      -> nothing
     end.
-        
-poll(Aid) -> 
-    Aid!{self(),getState},
-    receive 
-        {ok, Res} -> {ok, Res};
-        {error,Reason} -> {exception,Reason };
-        {nothing}->nothing
-    % after 0 
-    %     -> nothing 
+
+wait(Aid) ->
+    Aid!{wait, self()},
+    receive
+        {ok, Res}          -> {ok, Res};
+        {error, Error}     -> throw(Error);
+        {nothing}          -> wait(Aid)
     end.
-loop(State)->
-    receive 
-        {ok,Res} -> loop({ok,Res});
-        {error,Reason} -> loop({error,Reason});
-        {From,getState}-> 
+
+loop(State) ->
+    receive
+        {ok, Res}      -> loop({ok, Res});
+        {error, Error} -> loop({error, Error});
+        {poll, PollID} ->
             case State of
-                {init} -> From!{nothing},loop(State);
-                _->From!State,loop(State)
+                {runing} -> PollID!{nothing}, loop(State);
+                _        -> PollID!State, loop(State)
+            end;
+        {wait, WaitID} ->
+            case State of
+                {runing} -> WaitID!{nothing}, loop(State);
+                _        -> WaitID!State, loop(State)
             end
     end.
 
-testFun(Name) ->
-    io:format("Hello! ~p~n",[Name]).
+testFun(Timer) ->
+    timer:sleep(Timer),
+    io:format("*Function: sleep 1: ~w second ~n",[Timer/1000]),
+    timer:sleep(Timer),
+    io:format("*Function: sleep 2: ~w second ~n",[Timer/1000]),
+    timer:sleep(Timer),
+    io:format("*Function: sleep 3: ~w second ~n",[Timer/1000]),
+    timer:sleep(Timer),
+    io:format("*Function: sleep 4: ~w second ~n",[Timer/1000]).
+
+start() -> 
+    Aid = new(fun(MyTime) -> testFun(MyTime) end, 1000),
+    case poll(Aid) of
+        {ok, _} -> io:format("func finished~n", []);
+        {error, Reason1} -> io:format("poll geterror~p~n",[Reason1]);
+        nothing -> io:format("func is runing~n",[])
+    end,
+    timer:sleep(1000),
+    case poll(Aid) of
+        {ok, _} -> io:format("func finished~n", []);
+        {error, Reason2} -> io:format("poll geterror~p~n",[Reason2]);
+        nothing -> io:format("func is runing~n",[])
+    end,
+    timer:sleep(1000),
+    case poll(Aid) of
+        {ok, _} -> io:format("func finished~n", []);
+        {error, Reason3} -> io:format("poll geterror~p~n",[Reason3]);
+        nothing -> io:format("func is runing~n",[])
+    end,
+    io:format("wait~n",[]),
+    wait(Aid),
+    case poll(Aid) of
+        {ok, _} -> io:format("func finished~n", []);
+        {error, Reason4} -> io:format("poll geterror~p~n",[Reason4]);
+        {nothing} -> io:format("fun is runing~n",[])
+    end.
