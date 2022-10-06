@@ -1,0 +1,234 @@
+*** Submission ***
+
++ No significant packaging/building issues.
+
++ No major compiler warnings or style hints from OnlineTA.
+
++ Your report is correctly named.
+
++ You have readable listings of your code as an appendix in the report. Good!
+
+  - Your listing package correctly wraps long lines, so that they at
+    least don't run off the side of the page. However, this still
+    means that very long lines, or heavily indented blocks of code,
+    are needlessly hard to read when there are more than a few of them.
+    Try to limit your line lengths to 80 characters (or whatever your
+    listing package comfortably fits on one line), by either breaking
+    lines more often, or by using a different indentation style.
+
++ You have included a timesheet. Good!
+
+*** Warmup ***
+
++ Your transformed grammar looks correct.
+
+  - Please include at least one space between successive grammar
+    symbols in the rules, e.g., `E ::= T E'` instead of `E ::= TE'`,
+    since the latter looks like a single nonterminal.
+
++ Your ReadP parser passes all our tests. Good job!
+
+= The code of your ReadP parser has some non-trivial style issues.
+
+  = Since these issues also occur in your Boa parser, see
+    the feedback on that part for details.
+
+= You don't have a Parsec parser. No problem.
+
+*** Main task: code ***
+
+= Lexical issues: ok, but with a few problems
+
+  + You define a `token` parser to handle whitespace consistently.
+    And you only seem to use it necessary (other than one stray call with
+    `operExp`). That's good!
+
+  - ... but your handling of keywords is incorrect. You're supposed to treat
+    them as a special case, not use `token`. In some cases, you even check
+    for the keyword followed by a space explicitly, which is never good.
+    You can find an example in the slides.
+
+  - ... and your implementation of `token` skips whitespace both before AND
+    after the token, which is unnecessary. As we discussed in the lectures,
+    the common approach is to skip only *after* each token, and also at the
+    very beginning of the string.
+
+  - ... and you don't do this in the `rpStmts` parser. Skipping whitespace
+    and comments is the job of the `token` parser, and you shouldn't do it
+    explicitly anywhere else, except at the very beginning.
+
+= Syntactic issues: ok, but with a few problems
+
+  - In several places, you have redundant checks that should not be
+    necessary, like `not` followed by parentheses, or `not` followed by
+    a comment, etc. These seem like they were put in specifically
+    to pass certain tests. If they're necessary, it's indicative of a
+    bigger problem (probably, not handling keywords properly; see above).
+
+  - After stratifying the expression grammar by operator precedence
+    level, you didn't left-factorize the rule for relational
+    operators.  You thus effectively require the parser to "guess"
+    which alternative (no relop, or one of the 8 possible relations)
+    to pursue. While ReadP can handle that, it introduces a lot of
+    unnecessary backtracking, which may slow your parser down
+    substantially on large inputs. Instead, start by reading the first
+    arithmetic subexpression unconditionally; this will expose the
+    following relational operator (if there is one) and allow the
+    parser to choose the correct branch directly.
+
+  - You have completely separate alternatives for parsing enumerated
+    lists and comprehensions. While this may work correctly in a
+    backtracking parser (ReadP or Parsec with `try`), it introduces
+    a potentially serious inefficiency on inputs starting with
+    `[ <large expression> ...`, such as `[[...[[x]]..]]`, because
+    you will be re-parsing the `<large expression>` in each branch
+    of the choice. Instead, if the list is non-empty, you should parse
+    the first expression outside of a choice, and then split on
+    whether the rest of the input starts with `,`, `]`, or `for`.
+
+  - In parseString, if your `readP_to_S` returns multiple
+    alternatives, you arbitrarily select the last one, even though the
+    ReadP documentation doesn't specify that they are returned in any
+    particular order.  This is incorrect, even though it might
+    accidentally work for the grammar you are parsing, and with the
+    current version of ReadP. Instead, fix your parser to eliminate
+    ambiguities, so that `readP_to_S` only returns at most one
+    result in the first place.
+
+= General style issues: ok, but with a few problems
+
+  - In your ReadP-based parser you use <++ instead of +++ (or <|>)
+    without a clear reason. Deviating from the pure formalism
+    of CFGs (in which the order of alternatives is not significant)
+    makes your parser less robust and harder to argue correct. If you
+    are doing it to improve efficiency, most likely it won't make a
+    visible difference; if it does, you're probably compensating for a
+    serious performance bug elsewhere, and you should try to fix that
+    one instead.
+
+  - You often use the full, qualified names of imported functions.
+    For example, `Text.ParserCombinators.ReadP.many` instead of just `many`.
+    Avoiding this is the entire point of using `import` statements, which
+    you do, so there's no reason to do that.
+
+*** Main task: testing (your own code) ***
+
++ Tests are automated and runnable by `stack test`. Good!
+
+  - ... but they don't run properly. This is likely because of the last
+    test case, which might be a holdover from previous tests.
+    After removing it, it works fine.
+
+    Next time, make sure your tests run before submitting!
+
+= Somewhat minimal coverage, but acceptable.
+
+  + Both positive and negative tests (where applicable).
+
+    = But it would a good idea if you explicitly and *uniformly*
+      identified the negative tests, e.g., with a starting "-" or
+      "*", in their names, like in OnlineTA.
+
+*** Main task: testing (other code) ***
+
+- Your test suite doesn't always *build* (let alone work) correctly
+  with other valid implementations of the BoaParser module.
+
+  - Your test suite assumes that the type `ParseError` has a been
+    implemented in a particular way (e.g., as `String`), and you
+    compare error messages directly against constants of that
+    type. That's generally not a good idea in the first place (since
+    the exact wordings of the error messages are not specified
+    anywhere), but if you need do it for some reason, you should
+    exploit that ParseError is required to be in the `Show` class, so
+    you can always use `show` in it to obtain a string.
+
+  - You have changed the API of the BoaParser module by exporting more
+    functions than specified in the assignment text (and handed-out
+    skeleton code), presumably to facilitate testing of the individual
+    subparsers. You should never change the interface of a module in
+    this way, since exporting "unexpected" names may cause clashes
+    if the same name is also used for other purposes in another module.
+    It also means that your test suite is useless for testing other
+    implementations of the parser, which may not have the same internal
+    functions as yours (or calls them something different).
+
+    Unless the assignment text says otherwise, you should test your
+    code as well as you can by only using its official interface; if
+    that prevents you from fully testing something, discuss the issue
+    in the report, instead of modifying the API.
+
+- Your tests are too closely tied to your particular implementation
+  of the parser.
+
+  - Your negative test cases expect a specific error message, such as
+    "no parse". Even though this may be the only error message your
+    parser can produce, it's not specified as such in the assignment
+    text, and therefore you should not test explicitly for it.  It
+    would be much more robust, and compatible with other correct
+    implementations, to just check for whether parseString succeeds or
+    fails (regardless of message), like in the test-suite skeleton
+    included in the handout.
+
+*** Main task: report ***
+
++ Reasonable overview of main design/implementation choices.
+
+  - Perhaps the most important design choice you had to make was
+    whether to use `ReadP` or `Parsec`, yet you say nothing about
+    _why_ you chose one over the other.
+
+  - How did you handle string constants, especially the proper treatment
+    of `\`-escaped characters?
+
+  - How did you handle whitespace/comments, and especially the
+    situations where whitespace is actually required for token separation?
+
+  + Good explanation of how you handle operators.
+
+  + Good explanation of where you use the biased-choice combinators
+    in ReadP.
+
+    (It would be better to have used `+++`, as mentioned above,
+    but the explanation itself is good!)
+
++ Reasonably comprehensive and justified assessment, with a
+  satisfactory explanation of testing strategy and results.
+
+  + You have divided the assessment up into the suggested
+    categories. Good!
+
+  + Completeness: fine
+
+    + You seem to have implemented all the mandatory parts. Good!
+
+  = Correctness: mostly fine
+
+    - Your code is fine, but you base most of your claims on OnlineTA.
+      This is not good, as you will not have OnlineTA in the exam.
+      Try to spend more time on your own tests!
+
+  = Efficiency: OK
+  
+    + You did identify the efficiency issues in your code, which is
+      always good.
+
+    - But the reason for the inefficiency is the lack of left factorization,
+      which you did not comment on.
+
+  + Robustness: fine
+  
+    + Robustness isn't really a big concern for this assignment, since
+      there isn't much opportunity to invoke the required functions on
+      arguments for which their behavior is not specified.
+
+  + Maintainability: fine
+
+    = Your code has some clear maintainability issues, but you are aware
+      of them.
+
+*** Overall score: 4 / 6 ***
+
+The biggest issues with your code are your handling of keywords, your tests
+(there are not that many, and they were not handed in in a runnable state),
+and the fact that you didn't left-factorize. Everything else is mostly fine.
