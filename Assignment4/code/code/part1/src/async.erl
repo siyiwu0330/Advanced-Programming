@@ -11,8 +11,8 @@ new(Fun, Arg) ->
 
 runFun(Fun, Arg, Aid) ->
     spawn(fun() ->
-        try Res = Fun(Arg) of
-            _       -> Aid!{ok, Res}
+        try Fun(Arg) of
+            Res     -> Aid!{ok, Res}
         catch
             _:Error -> Aid!{error, Error}
         end

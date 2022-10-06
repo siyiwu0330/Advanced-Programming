@@ -4,9 +4,9 @@
          analytics/5, get_analytics/2, remove_analytics/3,
          stop/1]).
 
--type shortcode() :: string().
--type emoji() :: binary().
--type analytic_fun(State) :: fun((shortcode(), State) -> State).
+% -type shortcode() :: string().
+% -type emoji() :: binary().
+% -type analytic_fun(State) :: fun((shortcode(), State) -> State).
 
 
 start(Initial) ->
@@ -61,95 +61,102 @@ request_reply(Pid, Request) ->
 	end.
 
 
-loop(E) ->
+loop(EMap) ->
     ShortList = 
         lists:map(
             fun(Emoji) ->
                 case Emoji of
                     {Short, _, _, _} -> Short
                 end
-            end, E),
+            end, EMap),
     receive
         {From, {new_shortcode, Short, Emo}} ->
             case lists:member(Short, ShortList) of
                 true  ->
                     From!{self(), {error, "emoji already exists"}},
-                    loop(E);
+                    loop(EMap);
                 false ->
                     From!{self(), ok},
-                    loop([{Short, Emo, Short, []}|E])
+                    loop([{Short, Emo, Short, []}|EMap])
             end;
         {From, {alias, Short1, Short2}} ->
             case lists:member(Short1, ShortList) of
                 false ->
                     From!{self(), {error, "emoji_1 does not exist"}},
-                    loop(E);
+                    loop(EMap);
                 true  ->
                     case lists:member(Short2, ShortList) of
                         true  ->
                             From!{self(), {error, "emoji_2 already exists"}},
-                            loop(E);
+                            loop(EMap);
                         false ->
                             From!{self(), ok},
-                            loop([{Short2, getEmo(Short1, E), realShort(Short1, E), []}|E])
+                            loop([{Short2, getEmo(Short1, EMap), realShort(Short1, EMap), []}|EMap])
+                    end
             end;
         {From, {delete, Short}} ->
             case lists:member(Short, ShortList) of
                 false ->
-                    From!{self, {error, "emoji does not exist"}},
-                    loop(E);
+                    loop(EMap);
                 true  ->
                     From!{self(), ok},
-                    loop(deleteAll(Short, E))
+                    loop(deleteAll(realShort(Short, EMap), EMap))
             end;
         {From, {lookup, Short}} ->
             case lists:member(Short, ShortList) of
                 false ->
                     From!{self(), no_emoji},
-                    loop(E);
+                    loop(EMap);
                 true  ->
-                    From!{self(), {ok, getEmo(Short, E)}},
-                    loop(E)
+                    From!{self(), {ok, getEmo(Short, EMap)}},
+                    EMap_ = renewState(realShort(Short, EMap), EMap),
+                    loop(EMap_)
             end;
         {From, {analytics, Short, Fun, Label, Init}} ->
             case lists:member(Short, ShortList) of
                 false ->
                     From!{self(), {error, "emoji does not exist"}},
-                    loop(E);
+                    loop(EMap);
                 true  ->
-                    From!{self(), ok},
-                    loop(bindFun(Short, Fun, Label, Init, E))
+                    case labelExist(realShort(Short, EMap), Label, EMap) of
+                        true  ->
+                            From!{self(), {error, "lable already exists"}},
+                            loop(EMap);
+                        false ->
+                            From!{self(), ok},
+                            loop(bindFun(realShort(Short, EMap), Fun, Label, Init, EMap))
+                    end
             end;
         {From, {get_analytics, Short}} ->
             case lists:member(Short, ShortList) of
                 false ->
                     From!{self(), {error, "emoji does not exist"}},
-                    loop(E);
+                    loop(EMap);
                 true  ->
-                    From!{self(), {ok, getStat(Short, E)}},
-                    loop(E)
+                    From!{self(), {ok, getStat(realShort(Short, EMap), EMap)}},
+                    loop(EMap)
             end;
         {From, {remove_analytics, Short, Label}} ->
             case lists:member(Short, ShortList) of
                 false ->
                     From!{self(), {error, "emoji does not exist"}},
-                    loop(E);
+                    loop(EMap);
                 true  ->
                     From!{self(), ok},
-                    loop(removeFun(Short, Label, E))
+                    loop(removeFun(realShort(Short, EMap), Label, EMap))
             end;
         {From, stop} -> From!{self(), ok};
         {From, _} ->
             From!{self(), "syntax error"},
-            loop(E)
-    end
-end.
+            loop(EMap)
+    end.
+
 
 
 
 duplicate(ShortList)->
     case ShortList of
-        []          -> false;
+        [] -> false;
         [Head|Tail] ->
             case lists:member(Head, Tail) of
                 true  -> true;
@@ -163,8 +170,8 @@ withBind(List) ->
         [{Short, Emo}|Rest] -> [{Short, Emo, Short, []}|withBind(Rest)]
     end.
 
-realShort(Short, E) ->
-    case E of
+realShort(Short, EMap) ->
+    case EMap of
         [] -> noting;
         [{Short_, _, RealShort, _}|Rest] ->
             case Short_ =:= Short of
@@ -173,8 +180,8 @@ realShort(Short, E) ->
             end
     end.
 
-getEmo(Short, E) ->
-    case E of
+getEmo(Short, EMap) ->
+    case EMap of
         [] -> noting;
         [{Short_, Emo, _, _}|Rest] ->
             case Short_ =:= Short of
@@ -183,31 +190,103 @@ getEmo(Short, E) ->
             end
     end.
 
-deleteAll(Short, E) ->
-    case E of
+deleteAll(Short, EMap) ->
+    case EMap of
         [] -> [];
         [{Short_, Emo, RealShort, FunList}|Rest] ->
-            case RealShort =:= realShort(Short, E) of
-                true  -> [deleteAll(Short, Rest)];
+            case RealShort =:= Short of
+                true  -> deleteAll(Short, Rest);
                 false -> [{Short_, Emo, RealShort, FunList}|deleteAll(Short, Rest)]
             end
     end.
 
-bindFun(Short, Fun, Label, Init, E) ->
-    case E of
+renewState(Short, EMap) ->
+    case EMap of
         [] -> [];
         [{Short_, Emo, RealShort, FunList}|Rest] ->
             case Short_ =:= Short of
-                false -> [{Short_, Emo, RealShort, FunList}|bindFun(Short, Fun, Label, Init, Rest)];
+                true  -> [{Short_, Emo, RealShort, runFun(Short_, FunList)}|Rest];
+                false -> [{Short_, Emo, RealShort, FunList}|renewState(Short, Rest)]
+            end
+    end.
+
+runFun(Short, FunList) ->
+    case FunList of
+        [] -> [];
+        [{Fun, Label, State}|Rest] ->
+            try Fun(Short, State) of
+                _   -> [{Fun,Label,Fun(Short,State)}|runFun(Short,Rest)]
+            catch
+                _:_ -> [{Fun,Label,State}|runFun(Short,Rest)]
+            end
+    end.
+
+labelExist(Short, Label, EMap) ->
+    case EMap of
+        [] -> false;
+        [{Short_, _, _, FunList}|Rest] ->
+            case Short_ =:= Short of
+                false -> labelExist(Short, Label, Rest);
                 true  ->
-                    case RealShort =:= realShort(Short, E) of
-                        false -> bindFun(RealShort, Fun, Label, Init, E);
-                        true  -> [{Short_, Emo, RealShort, [{Fun, Label, Init}|FunList]}]
+                    case findLable(Label, FunList) of
+                        true  -> true;
+                        false -> labelExist(Short, Label, Rest)
                     end
             end
     end.
 
-getStat(Short, E) ->
-    case E of
+findLable(Label, FunList) ->
+    case FunList of
+        [] -> false;
+        [{_, Label_, _}|Rest] ->
+            case Label_ =:= Label of
+                true  -> true;
+                false -> findLable(Label, Rest)
+            end
+    end.
+
+bindFun(Short, Fun, Label, Init, EMap) ->
+    case EMap of
+        [] -> [];
+        [{Short_, Emo, RealShort, FunList}|Rest] ->
+            case Short_ =:= Short of
+                false -> [{Short_, Emo, RealShort, FunList}|bindFun(Short, Fun, Label, Init, Rest)];
+                true  -> [{Short_, Emo, RealShort, [{Fun, Label, Init}|FunList]}]
+            end
+    end.
+
+getStat(Short, EMap) ->
+    case EMap of
         [] -> nothing;
-        [{Short_, _, RealShort, FunList}]
+        [{Short_, _, _, FunList}|Rest] ->
+            case Short_ =:= Short of
+                true  -> showStat(FunList);
+                false -> getStat(Short, Rest)
+            end
+    end.
+
+showStat(FunList) ->
+    case FunList of
+        [] -> [];
+        [{_, Label, State}|Rest] -> [{Label, State}|showStat(Rest)]
+    end.
+
+removeFun(Short, Label, EMap) ->
+    case EMap of
+        [] -> [];
+        [{Short_, Emo, RealShort, FunList}|Rest] ->
+            case Short_ =:= Short of
+                true  -> [{Short_, Emo, RealShort, remove(Label, FunList)}|Rest];
+                false -> [{Short_, Emo, RealShort, FunList}|removeFun(Short, Label, Rest)]
+            end
+    end.
+
+remove(Label, FunList) ->
+    case FunList of
+        [] -> [];
+        [{Fun, Label_, State}|Rest] ->
+            case Label_ =:= Label of
+                true  -> Rest;
+                false -> [{Fun, Label_, State}|remove(Label, Rest)]
+            end
+    end.
