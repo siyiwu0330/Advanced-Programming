@@ -73,7 +73,7 @@ loop(EMap) ->
         {From, {new_shortcode, Short, Emo}} ->
             case lists:member(Short, ShortList) of
                 true  ->
-                    From!{self(), {error, "emoji already exists"}},
+                    From!{self(), {error, "new_shortcode error: |"++ Short ++"| already exists"}},
                     loop(EMap);
                 false ->
                     From!{self(), ok},
@@ -82,12 +82,12 @@ loop(EMap) ->
         {From, {alias, Short1, Short2}} ->
             case lists:member(Short1, ShortList) of
                 false ->
-                    From!{self(), {error, "emoji_1 does not exist"}},
+                    From!{self(), {error, "alias error: |"++ Short1 ++"| does not exist"}},
                     loop(EMap);
                 true  ->
                     case lists:member(Short2, ShortList) of
                         true  ->
-                            From!{self(), {error, "emoji_2 already exists"}},
+                            From!{self(), {error, "alias error: |"++ Short2 ++"| already exists"}},
                             loop(EMap);
                         false ->
                             From!{self(), ok},
@@ -109,18 +109,17 @@ loop(EMap) ->
                     loop(EMap);
                 true  ->
                     From!{self(), {ok, getEmo(Short, EMap)}},
-                    EMap_ = renewState(realShort(Short, EMap), EMap),
-                    loop(EMap_)
+                    loop(renewState(Short, realShort(Short, EMap), EMap))
             end;
         {From, {analytics, Short, Fun, Label, Init}} ->
             case lists:member(Short, ShortList) of
                 false ->
-                    From!{self(), {error, "emoji does not exist"}},
+                    From!{self(), {error, "analytics error: |"++ Short ++"| does not exist"}},
                     loop(EMap);
                 true  ->
                     case labelExist(realShort(Short, EMap), Label, EMap) of
                         true  ->
-                            From!{self(), {error, "lable already exists"}},
+                            From!{self(), {error, "analytics error: |"++ Label ++"| already exists"}},
                             loop(EMap);
                         false ->
                             From!{self(), ok},
@@ -130,7 +129,7 @@ loop(EMap) ->
         {From, {get_analytics, Short}} ->
             case lists:member(Short, ShortList) of
                 false ->
-                    From!{self(), {error, "emoji does not exist"}},
+                    From!{self(), {error, "get_analytics error: |"++ Short ++"| does not exist"}},
                     loop(EMap);
                 true  ->
                     From!{self(), {ok, getStat(realShort(Short, EMap), EMap)}},
@@ -139,7 +138,7 @@ loop(EMap) ->
         {From, {remove_analytics, Short, Label}} ->
             case lists:member(Short, ShortList) of
                 false ->
-                    From!{self(), {error, "emoji does not exist"}},
+                    From!{self(), {error, "remove_analytics error: |"++ Short ++"| does not exist"}},
                     loop(EMap);
                 true  ->
                     From!{self(), ok},
@@ -200,13 +199,13 @@ deleteAll(Short, EMap) ->
             end
     end.
 
-renewState(Short, EMap) ->
+renewState(Short, RealShort, EMap) ->
     case EMap of
         [] -> [];
-        [{Short_, Emo, RealShort, FunList}|Rest] ->
-            case Short_ =:= Short of
-                true  -> [{Short_, Emo, RealShort, runFun(Short_, FunList)}|Rest];
-                false -> [{Short_, Emo, RealShort, FunList}|renewState(Short, Rest)]
+        [{Short_, Emo, RealShort_, FunList}|Rest] ->
+            case (RealShort =:= RealShort_) and (RealShort =:= Short_) of
+                true  -> [{Short_, Emo, RealShort_, runFun(Short, FunList)}|Rest];
+                false -> [{Short_, Emo, RealShort_, FunList}|renewState(Short, RealShort, Rest)]
             end
     end.
 
@@ -215,9 +214,9 @@ runFun(Short, FunList) ->
         [] -> [];
         [{Fun, Label, State}|Rest] ->
             try Fun(Short, State) of
-                _   -> [{Fun,Label,Fun(Short,State)}|runFun(Short,Rest)]
+                NewState -> [{Fun,Label,NewState}|runFun(Short,Rest)]
             catch
-                _:_ -> [{Fun,Label,State}|runFun(Short,Rest)]
+                _:_      -> [{Fun,Label,State}|runFun(Short,Rest)]
             end
     end.
 
@@ -251,7 +250,7 @@ bindFun(Short, Fun, Label, Init, EMap) ->
         [{Short_, Emo, RealShort, FunList}|Rest] ->
             case Short_ =:= Short of
                 false -> [{Short_, Emo, RealShort, FunList}|bindFun(Short, Fun, Label, Init, Rest)];
-                true  -> [{Short_, Emo, RealShort, [{Fun, Label, Init}|FunList]}]
+                true  -> [{Short_, Emo, RealShort, [{Fun, Label, Init}|FunList]}|Rest]
             end
     end.
 
