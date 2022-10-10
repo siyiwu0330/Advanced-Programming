@@ -1,0 +1,21 @@
+# Template for collecting time-usage statistics for AP.
+# Please use the format '15m', '2h', or '1 h 20 m' (spaces are optional),
+#   or 'x' if you cannot, or prefer not to, give an estimate for some category.
+#   E.g., "Installation: 30 m", "Exploration: x",
+# Comments start with '#'. You may add your own explanatory remarks,
+#   but they may not get registered or processed systematically.
+# Please see the assignment text for detailed descriptions of the categories.
+#
+# YOUR ANSWERS WILL NOT AFFECT YOUR ASSIGNMENT GRADE.
+#
+Assignment: 5 # do not modify
+Installation: 0m # normally covered under Assignment 1/2; fill in otherwise
+Reading:
+Lectures:
+Exploration:
+Warmup:
+Development:
+Tests:
+Report:
+Other:  # if more than 1h total, please elaborate in comment
+# Thanks!
