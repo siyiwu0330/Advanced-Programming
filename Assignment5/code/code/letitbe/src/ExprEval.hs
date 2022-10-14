@@ -25,15 +25,15 @@ evalTop e = eval e M.empty
 
 simplify e =
   case e of
-    Oper Plus (Const 0) (Const c2) -> Const(c2)
-    Oper Plus (Const c1) (Const 0) -> Const(c1)
+    Oper Plus (Const 0) e2 -> e2
+    Oper Plus e1 (Const 0) -> e1
     Oper Plus (Const c1) (Const c2) -> Const(c1+c2)
-    Oper Minus (Const c1) (Const 0) -> Const(c1)
+    Oper Minus e1 (Const 0) -> e1
     Oper Minus (Const c1) (Const c2) -> Const(c1-c2)
-    Oper Times (Const 1) (Const c2) -> Const(c2)
-    Oper Times (Const 0) (Const _) -> Const(0)
-    Oper Times (Const c1) (Const 1) -> Const(c1)
-    Oper Times (Const _) (Const 0) -> Const(0)
+    Oper Times (Const 1) e2 -> e2
+    Oper Times (Const 0) _ -> Const(0)
+    Oper Times e1 (Const 1) -> e1
+    Oper Times _ (Const 0) -> Const(0)
     Oper Times (Const c1) (Const c2) -> Const(c1*c2)
     Oper op e1 e2 -> Oper op (simplify e1) (simplify e2)
     Let v e body -> case findVarUsed v body of

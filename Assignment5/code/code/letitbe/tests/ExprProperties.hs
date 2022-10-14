@@ -4,6 +4,7 @@ import Test.QuickCheck
 
 import ExprAst
 import qualified ExprEval as E
+import qualified ExprEval
 
 
 
@@ -13,16 +14,16 @@ exprN n = oneof
     [fmap ExprAst.Const (arbitrary::Gen Int)
     ,fmap ExprAst.Var (arbitrary::Gen String)
     , do 
-         x <- exprN (n `div` 2)
-         y <- exprN (n `div` 2)
+         x <- exprN' (n `div` 2)
+         y <- exprN' (n `div` 2)
          return (ExprAst.Oper Plus x y)
    , do 
-         x <- exprN (n `div` 2)
-         y <- exprN (n `div` 2)
+         x <- exprN' (n `div` 2)
+         y <- exprN' (n `div` 2)
          return (ExprAst.Oper Minus x y)
    , do 
-         x <- exprN (n `div` 2)
-         y <- exprN (n `div` 2)
+         x <- exprN' (n `div` 2)
+         y <- exprN' (n `div` 2)
          return (ExprAst.Oper Times x y)
    , do 
          i <- fmap ExprAst.Var (arbitrary::Gen String)
@@ -59,8 +60,8 @@ instance Arbitrary Expr where
    arbitrary = sized exprN
 
 prop_eval_simplify :: Expr -> Property
-prop_eval_simplify x = E.evalTop x === E.evalTop (E.simplify x)
-
+prop_eval_simplify x =classify (ExprEval.findVarUsed "" x) "have an empty string as identifier" (E.evalTop x === E.evalTop (E.simplify x))
+--prop_eval_simplify x = E.evalTop x === E.evalTop (E.simplify x)
 
 getIdent :: Expr -> String
 getIdent (ExprAst.Var id) = id
