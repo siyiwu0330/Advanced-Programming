@@ -1,6 +1,6 @@
 # Advanced-Programming (Haskell & Erlang)
 
-This is the set of assignments for UCPU Advanced Programming course 2022. The main purpose of the project is to manage assignments. If some classmates are lucky enough to find our project on GitHub, please do not completely copy our code. Of course, you are welcome to refer to our ideas.
+This is the set of assignments for UCPH Advanced Programming course 2022. The main purpose of the project is to manage assignments. If some classmates are lucky enough to find our project on GitHub, please do not completely copy our code. Of course, you are welcome to refer to our ideas.
 
 ## Completion
 
